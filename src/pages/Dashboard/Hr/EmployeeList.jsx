@@ -1,422 +1,353 @@
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-  Input,
-} from "@material-tailwind/react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
-import { motion } from "framer-motion";
-import LoadingSpinner from "../../../components/Shared/LoadingSpinner";
-import useAxiosSecure from "../../../hooks/useAxiosSecure";
+import React, { useState } from "react";
+import DataTable from "react-data-table-component";
+import { FaFilter, FaEdit } from "react-icons/fa";
+import EmployeeDetails from "./EmployeeDetails";
+import EmployeeUpdateModal from "./EmployeeUpdateModal";
+import "./EmployeeList.css";
 
 function EmployeeList() {
-  const axiosSecure = useAxiosSecure();
-  const navigate = useNavigate();
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [month, setMonth] = useState("");
-  const [year, setYear] = useState("");
+  
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  // modal
-  const [open, setOpen] = useState(false);
-  const handleOpen = () => setOpen(!open);
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEmployeeForUpdate, setSelectedEmployeeForUpdate] = useState(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
-  // all employees data
-  const {
-    data: employees = [],
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ["employees"],
-    queryFn: async () => {
-      const { data } = await axiosSecure.get("/employees");
-      return data;
+  // Hardcoded employee data with currentRole field added
+  const [employees, setEmployees] = useState([
+    {
+      _id: "1",
+      name: "Lim Alcovendas",
+      email: "limalcovendas@company.com",
+      department: "Sales",
+      hiredDate: "01-28-2023",
+      firstName: "Lim",
+      middleName: "",
+      lastName: "Alcovendas",
+      jobTitle: "Sales Manager",
+      currentRole: "Manager",
+      phoneNumber: "+63 963-633-4053",
+      gender: "Male",
+      age: 23,
+      birthDate: "April 5, 2003",
+      birthPlace: "Nodado Hospital, Caloocan City",
+      civilStatus: "Single",
+      nationality: "Filipino",
+      fullAddress: "Blk 16, Lot 1, Pkg 3, Phase 12 Brgy. 188, Tala Caloocan City, 1427",
+      sss: "2331-2343-1132",
+      tin: "12312-31546-422",
+      philhealth: "139924756-1323FA",
+      gsis: "3424636-1232-5",
+      motherMaidenName: "Evelyn Alcovendas",
+      motherPhoneNumber: "09123456789",
+      motherOccupation: "Home Maker",
+      motherStatus: "Alive",
+      motherAddress: "Blk 16, Lot 1, Pkg 3, Phase 12 Brgy. 188, Tala Caloocan City, 1427",
+      fatherMaidenName: "Rommel San-Jose",
+      fatherPhoneNumber: "09987654321",
+      fatherOccupation: "AV Works",
+      fatherStatus: "Alive",
+      fatherAddress: "Blk 16, Lot 1, Pkg 3, Phase 12 Brgy. 188, Tala Caloocan City, 1427",
+      contactName: "Rommel San-Jose",
+      contactPhoneNumber: "09987654321",
+      contactRelationship: "Father",
+      employeeNumber: "0023-232348-2324",
     },
+    {
+      _id: "2",
+      name: "Ezekiel Olasiman",
+      email: "zekeolasiman@company.com",
+      department: "Marketing",
+      jobTitle: "Marketing Specialist",
+      currentRole: "Specialist",
+      employeeNumber: "0023-232348-2325",
+      hiredDate: "04-07-2023",
+    },
+    {
+      _id: "3",
+      name: "Klei Ishia Pagatpatan",
+      email: "kleipagatpatan@company.com",
+      department: "Marketing",
+      jobTitle: "Digital Marketing Coordinator",
+      currentRole: "Coordinator",
+      employeeNumber: "0023-232348-2326",
+      hiredDate: "06-11-2021",
+    },
+    {
+      _id: "4",
+      name: "Regine Mae Hambiol",
+      email: "reginehambiol@company.com",
+      department: "Compliance",
+      jobTitle: "Compliance Officer",
+      currentRole: "Officer",
+      employeeNumber: "0023-232348-2327",
+      hiredDate: "11-19-2023",
+    },
+    {
+      _id: "5",
+      name: "Mark Regie Magtangob",
+      email: "regiemagtangob@company.com",
+      department: "Sales",
+      jobTitle: "Sales Representative",
+      currentRole: "Representative",
+      employeeNumber: "0023-232348-2328",
+      hiredDate: "07-10-2024",
+    },
+    {
+      _id: "6",
+      name: "Jesalle Villegas",
+      email: "jesallevillegas@company.com",
+      department: "Compliance",
+      jobTitle: "Compliance Analyst",
+      currentRole: "Analyst",
+      employeeNumber: "0023-232348-2329",
+      hiredDate: "08-08-2022",
+    }
+  ]);
+
+  // Get unique departments for filter dropdown
+  const departments = [...new Set(employees.map(emp => emp.department))].sort();
+
+  // Filter employees based on search term and selected department
+  const filteredEmployees = employees.filter(employee => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = employee.name.toLowerCase().includes(searchLower);
+    const matchesDepartment = selectedDepartment === "" || employee.department === selectedDepartment;
+    return matchesSearch && matchesDepartment;
   });
 
-  // toggle Verification
-  const toggleVerification = async (id, isVerified) => {
-    const { data } = await axiosSecure.patch(`/employeesVerified/${id}`, {
-      isVerified: !isVerified,
-    });
-    if (data?.modifiedCount > 0) {
-      refetch();
-      toast.success(
-        `Employee verification status successfully ${
-          isVerified ? "removed" : "updated"
-        }!`
-      );
-    }
+  // Toggle filter dropdown
+  const toggleFilter = () => {
+    setIsFilterOpen(!isFilterOpen);
   };
 
-  // Helper function to format salary as money with commas
-  const formatSalary = (salary) => {
-    if (salary === null || salary === undefined || salary === "") return "$0";
-    const numSalary = Number(salary);
-    if (isNaN(numSalary)) return "$0";
-    return "$" + numSalary.toLocaleString();
+  // Handle department selection
+  const handleDepartmentSelect = (department) => {
+    setSelectedDepartment(department);
+    setIsFilterOpen(false);
   };
 
-  // ReactTable columns
+  // Clear filter
+  const clearFilter = () => {
+    setSelectedDepartment("");
+    setIsFilterOpen(false);
+  };
+
+  // Helper function to parse date strings in MM-DD-YYYY format
+  const parseDate = (dateString) => {
+    const [month, day, year] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  // Handle employee update
+  const handleEmployeeUpdate = (employeeId, updatedData) => {
+    setEmployees(prevEmployees => 
+      prevEmployees.map(emp => 
+        emp._id === employeeId 
+          ? { ...emp, ...updatedData }
+          : emp
+      )
+    );
+    console.log(`Employee ${employeeId} updated with:`, updatedData);
+  };
+
+  // Define columns for react-data-table-component with custom sorting
   const columns = [
-    { header: "Name", accessorKey: "name" },
-    { header: "Email", accessorKey: "email" },
-    { header: "Role", accessorKey: "role" },
     {
-      header: "Verified",
-      accessorKey: "isVerified",
-      cell: ({ row }) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleVerification(row.original._id, row.original.isVerified);
-          }}
-          className={`px-2 py-1 rounded ${
-            row.original.isVerified ? "bg-green-500" : "bg-red-500"
-          }`}
-        >
-          {row.original.isVerified ? "Yes" : "No"}
-        </button>
-      ),
-    },
-    { header: "Account No.", accessorKey: "bankAccountNo" },
-    { 
-      header: "Salary", 
-      accessorKey: "salary",
-      cell: ({ row }) => formatSalary(row.original.salary)
+      name: "Employee No.",
+      selector: row => row.employeeNumber,
+      sortable: true,
+      width: "13%",
+      sortFunction: (rowA, rowB) => {
+        return rowA.employeeNumber.localeCompare(rowB.employeeNumber);
+      },
     },
     {
-      header: "Pay",
-      cell: ({ row }) => (
+      name: "Name",
+      selector: row => row.name,
+      sortable: true,
+      width: "18%",
+      sortFunction: (rowA, rowB) => {
+        return rowA.name.localeCompare(rowB.name);
+      },
+    },
+    {
+      name: "Email",
+      selector: row => row.email,
+      sortable: true,
+      width: "20%",
+      sortFunction: (rowA, rowB) => {
+        return rowA.email.localeCompare(rowB.email);
+      },
+    },
+    {
+      name: "Department",
+      selector: row => row.department,
+      sortable: true,
+      width: "13%",
+      sortFunction: (rowA, rowB) => {
+        return rowA.department.localeCompare(rowB.department);
+      },
+    },
+    {
+      name: "Job Title",
+      selector: row => row.jobTitle,
+      sortable: true,
+      width: "15%",
+      sortFunction: (rowA, rowB) => {
+        return rowA.jobTitle.localeCompare(rowB.jobTitle);
+      },
+    },
+    {
+      name: "Hired Date",
+      selector: row => row.hiredDate,
+      sortable: true,
+      width: "11%",
+      sortFunction: (rowA, rowB) => {
+        const dateA = parseDate(rowA.hiredDate);
+        const dateB = parseDate(rowB.hiredDate);
+        return dateB - dateA; // Sort by recent date (newest first)
+      },
+    },
+    {
+      name: "Action",
+      cell: (row) => (
         <button
+          style={{
+            backgroundColor: '#ff5003',
+            color: 'white',
+            border: 'none',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            fontSize: '12px'
+          }}
           onClick={(e) => {
             e.stopPropagation();
-            if (row.original.isVerified) {
-              setSelectedEmployee(row.original);
-              handleOpen();
-            } else {
-              toast.warning("Only verified employees can be paid.");
-            }
+            setSelectedEmployeeForUpdate(row);
+            setIsUpdateModalOpen(true);
           }}
-          disabled={!row.original.isVerified}
-          className={`px-4 py-2 rounded ${
-            row.original.isVerified
-              ? "bg-button hover:bg-hoverColor text-white"
-              : "bg-gray-400 cursor-not-allowed text-white"
-          }`}
         >
-          Pay
+          <FaEdit size={14} />
+          Update
         </button>
       ),
+      width: "10%",
+      ignoreRowClick: true,
+      allowOverflow: true,
+      button: true,
     },
   ];
 
-  // Filter employees based on search term and role
-  const filteredEmployees = useMemo(() => {
-    let filtered = employees;
-    
-    if (searchTerm) {
-      filtered = filtered.filter(employee =>
-        employee.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (roleFilter) {
-      filtered = filtered.filter(employee =>
-        employee.role.toLowerCase() === roleFilter.toLowerCase()
-      );
-    }
-    
-    return filtered;
-  }, [employees, searchTerm, roleFilter]);
-
-  // ReactTable
-  const table = useReactTable({
-    data: filteredEmployees,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-  });
-
-  // handlePay
-  const handlePayRequest = () => {
-    const { name, email, designation, photo, salary } = selectedEmployee;
-    const payInfo = {
-      name,
-      email,
-      designation,
-      photo,
-      salary,
-      month,
-      year,
-      isPaid: false,
-      createdAt: new Date(),
-    };
-
-    // post payroll
-    axiosSecure
-      .post("/payroll", payInfo)
-      .then((result) => {
-        if (result?.data?.insertedId) {
-          toast.success("Pay request submitted successfully!");
-        }
-      })
-      .catch((error) => {
-        const errorMessage =
-          error?.response?.data?.message || "Something went wrong!";
-        toast.error(errorMessage);
-      });
+  // Custom styles for the data table
+  const customStyles = {
+    headRow: {
+      style: {
+        backgroundColor: '#003f7d',
+        fontWeight: 'bold',
+        color: '#fff',
+        fontSize: '14px',
+      },
+    },
+    rows: {
+      style: {
+        minHeight: '55px',
+        fontSize: '12px',
+        backgroundColor: '#ffffff',
+        color: '#000000',
+      },
+    },
+    pagination: {
+      style: {
+        backgroundColor: '#f8f9fa',
+        borderTop: '1px solid #e0e0e0',
+      },
+    },
   };
 
-  if (isLoading) return <LoadingSpinner />;
+  // Handle row click to open modal with employee details
+  const handleRowClicked = (row) => {
+    setSelectedEmployee(row);
+    setIsModalOpen(true);
+  };
+
+  // Close modal handler
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedEmployee(null);
+  };
 
   return (
-    <div className="py-6 md:py-12">
-      <h2 className="text-3xl font-semibold text-center mb-4 md:mb-8">
-        Employee Table
-      </h2>
-      
-      {/* Search and Filter Controls */}
-      <div className="mb-4 mx-4 md:mx-8 flex flex-col md:flex-row items-center gap-4">
-        {/* Search Input */}
-        <div className="flex-1">
-          <Input
-            type="text"
-            placeholder="Search by employee name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-            icon={
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-5 h-5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-            }
-          />
-        </div>
-        
-        {/* Role Filter Dropdown */}
-        <div className="w-full md:w-auto">
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="block w-full md:w-48 appearance-none rounded-md border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-          >
-            <option value="">All Roles</option>
-            <option value="HR">HR</option>
-            <option value="Employee">Employee</option>
-          </select>
-        </div>
-      </div>
-      
-      <div className="overflow-x-auto mx-4 md:mx-8">
-        <table className="min-w-full table-auto overflow-hidden">
-          <thead className="bg-gray-200 text-gray-700">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="py-3 px-6 text-left">
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className="border-b hover:bg-gray-100 hover:text-primary cursor-pointer"
-                onClick={() => navigate(`/dashboard/details/${row.original.email}`)}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="py-3 px-6">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="p-4 flex justify-between items-center">
-          {/* Previous Button */}
-          <button
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            className={`px-4 py-2 rounded ${
-              table.getCanPreviousPage()
-                ? "bg-primary text-white hover:bg-blue-900"
-                : "bg-gray-300 text-gray-600 cursor-not-allowed"
-            }`}
-          >
-            Previous
-          </button>
-
-          {/* Page Info */}
-          <span className="text-sm">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
-          </span>
-
-          {/* Next Button */}
-          <button
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            className={`px-4 py-2 rounded ${
-              table.getCanNextPage()
-                ? "bg-primary text-white hover:bg-blue-900"
-                : "bg-gray-300 text-gray-600 cursor-not-allowed"
-            }`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-      {/* Modal */}
-      <Dialog open={open} handler={handleOpen}>
-        <DialogHeader>Pay Employee</DialogHeader>
-        <DialogBody>
-          <div className="space-y-4">
-            <p>
-              <strong>Employee Name:</strong> {selectedEmployee?.name}
-            </p>
-            <p>
-              <strong>Salary:</strong> {formatSalary(selectedEmployee?.salary)}
-            </p>
-            <div className="space-y-4">
-              {/* Month Selector */}
-              <div>
-                <label
-                  htmlFor="month"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Month
-                </label>
-                <div className="relative mt-1">
-                  <select
-                    required
-                    id="month"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    className="block w-full appearance-none rounded-md border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                  >
-                    <option value="" disabled>
-                      Select a month
-                    </option>
-                    <option value="January">January</option>
-                    <option value="February">February</option>
-                    <option value="March">March</option>
-                    <option value="April">April</option>
-                    <option value="May">May</option>
-                    <option value="June">June</option>
-                    <option value="July">July</option>
-                    <option value="August">August</option>
-                    <option value="September">September</option>
-                    <option value="October">October</option>
-                    <option value="November">November</option>
-                    <option value="December">December</option>
-                  </select>
-                  {/* Dropdown Icon */}
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                    <svg
-                      className="h-4 w-4 text-gray-400"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* Year Input */}
-              <div>
-                <label
-                  htmlFor="year"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Year
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    required
-                    type="text"
-                    id="year"
-                    value={year}
-                    onChange={(e) => setYear(e.target.value)}
-                    placeholder="Enter year (e.g., 2025)"
-                    className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-            </div>
+    <div className="employee-list-container">
+      <div className="employee-list-table-container">
+        <div className="controls-container">
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search by Employee Name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
           </div>
-        </DialogBody>
-        <DialogFooter>
-          <Button
-            variant="text"
-            color="red"
-            onClick={handleOpen}
-            className="mr-1"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="gradient"
-            color="green"
-            onClick={() => {
-              handlePayRequest();
-              handleOpen();
-            }}
-            disabled={
-              !selectedEmployee?.isVerified ||
-              !month ||
-              !year ||
-              isNaN(year) ||
-              year.length !== 4
-            }
-          >
-            Pay
-          </Button>
-        </DialogFooter>
-      </Dialog>
+          <div className="filter-container">
+            <button 
+              className={`filter-button ${selectedDepartment ? 'active' : ''}`}
+              onClick={toggleFilter}
+            >
+              <FaFilter />
+            </button>
+            {isFilterOpen && (
+              <div className="filter-dropdown">
+                <div className="filter-dropdown-header">
+                  <span>Filter by Department</span>
+                  <button 
+                    className="clear-filter-btn"
+                    onClick={clearFilter}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {departments.map((department) => (
+                  <div
+                    key={department}
+                    className={`filter-option ${selectedDepartment === department ? 'selected' : ''}`}
+                    onClick={() => handleDepartmentSelect(department)}
+                  >
+                    {department}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <DataTable
+          columns={columns}
+          data={filteredEmployees}
+          pagination
+          highlightOnHover
+          responsive
+          customStyles={customStyles}
+          paginationPerPage={6}
+          paginationRowsPerPageOptions={[6, 12, 18, 24]}
+          onRowClicked={handleRowClicked}
+          pointerOnHover
+        />
+      </div>
+      {isModalOpen && (
+        <EmployeeDetails employee={selectedEmployee} onClose={closeModal} />
+      )}
+      <EmployeeUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        employee={selectedEmployeeForUpdate}
+        onUpdateEmployee={handleEmployeeUpdate}
+      />
     </div>
   );
 }
